@@ -7,6 +7,9 @@
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
 		"test": "vitest",
+		"test:watch": "vitest --watch",
+		"test:run": "vitest run",
+		"test:cov": "vitest run --coverage",
 		"cf-typegen": "wrangler types"
 	},
 	"devDependencies": {
