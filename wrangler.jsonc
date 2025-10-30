@@ -10,13 +10,7 @@
 	"observability": {
 		"enabled": true
 	},
-	"routes": [
-		{
-			"pattern": "domain.com",
-			"zone_id": "your-zone-id",
-			"custom_domain": true,
-		}
-	]
+	// To bind a custom domain, configure routes when you have real values
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
