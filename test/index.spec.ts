@@ -56,17 +56,19 @@ describe('Worker fetch routing and proxy', () => {
 		expect(text2).toBe(text1);
 	});
 
-	it('non-200 upstream leads to 500 (current behavior)', async () => {
-		const raw = makeHttpResponse('HTTP/1.1 404 Not Found', { 'Content-Length': '9' }, 'not found');
-		installConnectMock(raw);
-		vi.resetModules();
-		const { default: worker } = await import('../src/index');
-		const req = new IncomingRequest('https://example.com/services/foo');
-		const ctx = createExecutionContext();
-		const res = await worker.fetch(req, env, ctx);
-		await waitOnExecutionContext(ctx);
-		expect(res.status).toBe(500);
-	});
+it('forwards non-200 upstream status and body', async () => {
+    const raw = makeHttpResponse('HTTP/1.1 404 Not Found', { 'Content-Length': '9' }, 'not found');
+    installConnectMock(raw);
+    vi.resetModules();
+    const { default: worker } = await import('../src/index');
+    const req = new IncomingRequest('https://example.com/services/foo');
+    const ctx = createExecutionContext();
+    const res = await worker.fetch(req, env, ctx);
+    await waitOnExecutionContext(ctx);
+    expect(res.status).toBe(404);
+    const txt = await res.text();
+    expect(txt).toBe('not found');
+});
 });
 // Integration-like but directly via worker.fetch to ensure mocks take effect consistently
 describe('Integration-like via direct fetch', () => {

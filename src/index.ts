@@ -102,38 +102,13 @@ async function tcpRequest(request: RequestData) {
 			if (done) break;
 			result += decoder.decode(value);
 		}
-		const parsed = parseResponse(result);
-		if (parsed.statusCode === 429) {
-			// Man how did we get rate limited on raw TCP?
-			throw new Error('Rate limited');
-		}
-		let body = null;
-		try {
-			body = JSON.parse(parsed.bodyData);
-		} catch {
-			// Whatevs
-		}
-		if (parsed.statusCode === 404) {
-			throw new Error('Not found');
-		}
-		if (parsed.statusCode === 204 && !body) {
-			// Bad request
-			throw new Error('Bad request');
-		}
-		if (parsed.statusCode !== 200) {
-			// Log the body
-			console.log(parsed.bodyData);
-			throw new Error('Unknown error');
-		}
-		const contentType = parsed.headers['content-type'];
-		if (!contentType || !contentType.includes('json')) {
-			throw new Error('Invalid content type');
-		}
-		body.request_type = 'tcp';
-		return {
-			body,
-			headers: parsed.headers,
-		}
+        const parsed = parseResponse(result);
+        // Return raw upstream response details; caller will decide how to handle
+        return {
+            statusCode: parsed.statusCode,
+            headers: parsed.headers,
+            bodyData: parsed.bodyData,
+        } as const;
 	} catch (err) {
 		console.error(err);
 		return null;
@@ -183,16 +158,46 @@ export default {
 		}
 
 		// Create our TCP request
-		const tcpResponse = await tcpRequest(requestData);
-		if (!tcpResponse) {
-			return new Response('Internal Server Error', { status: 500 });
-		}
-		// For now just return data we grab
-		const response = new Response(JSON.stringify(tcpResponse.body), {
-			headers: tcpResponse.headers,
-		});
-		await cache.put(request, response.clone());
-		return response;
+        const tcpResponse = await tcpRequest(requestData);
+        if (!tcpResponse) {
+            return new Response('Internal Server Error', { status: 500 });
+        }
+
+        // Forward non-200 responses as-is
+        if (tcpResponse.statusCode !== 200) {
+            return new Response(tcpResponse.bodyData, {
+                status: tcpResponse.statusCode,
+                headers: tcpResponse.headers,
+            });
+        }
+
+        // For 200s, if JSON, annotate and return JSON; otherwise forward as-is
+        const contentType = tcpResponse.headers['content-type'];
+        if (contentType && contentType.includes('json')) {
+            let bodyObj: any;
+            try {
+                bodyObj = JSON.parse(tcpResponse.bodyData);
+            } catch {
+                // If body isn't valid JSON despite content-type, just forward raw
+                return new Response(tcpResponse.bodyData, {
+                    status: tcpResponse.statusCode,
+                    headers: tcpResponse.headers,
+                });
+            }
+            bodyObj.request_type = 'tcp';
+            const response = new Response(JSON.stringify(bodyObj), {
+                status: tcpResponse.statusCode,
+                headers: tcpResponse.headers,
+            });
+            await cache.put(request, response.clone());
+            return response;
+        }
+
+        // Non-JSON 200s: forward as-is and do not cache
+        return new Response(tcpResponse.bodyData, {
+            status: tcpResponse.statusCode,
+            headers: tcpResponse.headers,
+        });
 	},
 } satisfies ExportedHandler<Env>;
 
