@@ -31,11 +31,13 @@ jobs:
           command: deploy
 
       - name: Bind custom domain (optional)
-        if: ${{ secrets.CUSTOM_DOMAIN != '' }}
+        env:
+          CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN }}
+        if: ${{ env.CUSTOM_DOMAIN != '' }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: custom-domains add ${{ secrets.CUSTOM_DOMAIN }}
+          command: custom-domains add ${{ env.CUSTOM_DOMAIN }}
 
 
